@@ -5,6 +5,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import pino from "pino";
+import qrcode from "qrcode-terminal";
 import { getAuthState } from "./auth.js";
 import { store } from "./store.js";
 
@@ -48,7 +49,7 @@ export async function connectWhatsApp(): Promise<WASocket> {
     version,
     logger,
     auth: state,
-    printQRInTerminal: true,
+    // QR is rendered manually via qrcode-terminal in connection.update handler
   });
 
   // Bind our custom store to socket events
@@ -60,6 +61,7 @@ export async function connectWhatsApp(): Promise<WASocket> {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      qrcode.generate(qr, { small: true });
       console.error(
         "[whatsapp] Scan the QR code above with WhatsApp on your phone"
       );
