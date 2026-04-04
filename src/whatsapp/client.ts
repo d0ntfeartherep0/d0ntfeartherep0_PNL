@@ -9,7 +9,7 @@ import qrcode from "qrcode-terminal";
 import { getAuthState } from "./auth.js";
 import { store } from "./store.js";
 
-const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
+const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
 
 let sock: WASocket | null = null;
 let connectionReady = false;
