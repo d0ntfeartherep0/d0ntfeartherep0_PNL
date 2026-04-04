@@ -21,7 +21,7 @@ async function main() {
   console.log("  Settings > Linked Devices > Link a Device");
   console.log("");
 
-  await connectWhatsApp();
+  await connectWhatsApp({ interactive: true });
 
   const info = getConnectionInfo();
   if (info.connected) {

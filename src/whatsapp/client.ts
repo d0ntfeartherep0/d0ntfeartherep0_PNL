@@ -41,7 +41,15 @@ export function getConnectionInfo(): {
   };
 }
 
-export async function connectWhatsApp(): Promise<WASocket> {
+export interface ConnectOptions {
+  /** If true, show QR codes for interactive auth. If false, fail on auth required. */
+  interactive?: boolean;
+}
+
+export async function connectWhatsApp(
+  options: ConnectOptions = {}
+): Promise<WASocket> {
+  const { interactive = false } = options;
   const { version } = await fetchLatestBaileysVersion();
   const { state, saveCreds } = await getAuthState();
 
@@ -49,7 +57,6 @@ export async function connectWhatsApp(): Promise<WASocket> {
     version,
     logger,
     auth: state,
-    // QR is rendered manually via qrcode-terminal in connection.update handler
   });
 
   // Bind our custom store to socket events
@@ -57,56 +64,77 @@ export async function connectWhatsApp(): Promise<WASocket> {
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect, qr } = update;
+  // Wait for connection result
+  const result = await new Promise<"open" | "auth_required" | "failed">(
+    (resolve) => {
+      const timeout = setTimeout(() => {
+        resolve("failed");
+      }, interactive ? 120_000 : 30_000);
 
-    if (qr) {
-      qrcode.generate(qr, { small: true });
-      console.error(
-        "[whatsapp] Scan the QR code above with WhatsApp on your phone"
-      );
-      console.error(
-        "[whatsapp] Go to Settings > Linked Devices > Link a Device"
-      );
+      sock!.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+          if (!interactive) {
+            clearTimeout(timeout);
+            resolve("auth_required");
+            return;
+          }
+          qrcode.generate(qr, { small: true });
+          console.error(
+            "[whatsapp] Scan the QR code above with WhatsApp on your phone"
+          );
+          console.error(
+            "[whatsapp] Go to Settings > Linked Devices > Link a Device"
+          );
+        }
+
+        if (connection === "close") {
+          connectionReady = false;
+          const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
+
+          if (reason === DisconnectReason.loggedOut) {
+            console.error(
+              "[whatsapp] Logged out. Delete auth_state/ and re-authenticate."
+            );
+            clearTimeout(timeout);
+            resolve("auth_required");
+          } else if (interactive) {
+            console.error(
+              `[whatsapp] Disconnected (reason: ${reason}), reconnecting...`
+            );
+            setTimeout(() => connectWhatsApp(options), 3000);
+          } else {
+            clearTimeout(timeout);
+            resolve("failed");
+          }
+        } else if (connection === "open") {
+          connectionReady = true;
+          console.error(
+            `[whatsapp] Connected as ${sock?.user?.name || sock?.user?.id}`
+          );
+          clearTimeout(timeout);
+          resolve("open");
+        }
+      });
     }
+  );
 
-    if (connection === "close") {
-      connectionReady = false;
-      const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
+  if (result === "auth_required") {
+    throw new Error(
+      "WhatsApp authentication expired. Please re-authenticate:\n" +
+        "  1. Delete the auth_state/ directory: rm -rf auth_state/\n" +
+        "  2. Run: npm run auth\n" +
+        "  3. Scan the QR code with your phone\n" +
+        "  4. Then run: npm run digest"
+    );
+  }
 
-      if (reason === DisconnectReason.loggedOut) {
-        console.error(
-          "[whatsapp] Logged out. Delete auth_state/ and re-authenticate."
-        );
-      } else {
-        console.error(
-          `[whatsapp] Disconnected (reason: ${reason}), reconnecting...`
-        );
-        setTimeout(() => connectWhatsApp(), 3000);
-      }
-    } else if (connection === "open") {
-      connectionReady = true;
-      console.error(
-        `[whatsapp] Connected as ${sock?.user?.name || sock?.user?.id}`
-      );
-    }
-  });
-
-  // Wait for initial connection (up to 60 seconds for QR scanning)
-  await new Promise<void>((resolve) => {
-    if (connectionReady) return resolve();
-
-    const timeout = setTimeout(() => {
-      resolve();
-    }, 60_000);
-
-    sock!.ev.on("connection.update", (update) => {
-      if (update.connection === "open") {
-        clearTimeout(timeout);
-        resolve();
-      }
-    });
-  });
+  if (result === "failed") {
+    throw new Error(
+      "WhatsApp connection timed out. Check your internet connection and try again."
+    );
+  }
 
   return sock;
 }
