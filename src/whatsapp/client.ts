@@ -6,13 +6,20 @@ import makeWASocket, {
 import { Boom } from "@hapi/boom";
 import pino from "pino";
 import qrcode from "qrcode-terminal";
+import { existsSync } from "fs";
 import { getAuthState } from "./auth.js";
 import { store } from "./store.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "silent" });
+const AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || "./auth_state";
 
 let sock: WASocket | null = null;
 let connectionReady = false;
+
+function hasStoredCredentials(): boolean {
+  // Baileys stores creds.json in the auth directory
+  return existsSync(`${AUTH_DIR}/creds.json`);
+}
 
 export function isConnected(): boolean {
   return connectionReady && sock !== null;
@@ -67,32 +74,51 @@ export async function connectWhatsApp(
   options: ConnectOptions = {}
 ): Promise<WASocket> {
   const { interactive = false } = options;
+  const hasCreds = hasStoredCredentials();
 
+  // No credentials at all — must authenticate interactively
+  if (!hasCreds && !interactive) {
+    throw new Error(
+      "No WhatsApp credentials found. Please authenticate first:\n" +
+        "  1. Run: npm run auth\n" +
+        "  2. Scan the QR code with your phone\n" +
+        "  3. Then run: npm run digest"
+    );
+  }
+
+  let qrCount = 0;
   let currentSock = await createSocket();
 
   const result = await new Promise<"open" | "auth_required" | "failed">(
     (resolve) => {
       const timeout = setTimeout(() => {
         resolve("failed");
-      }, interactive ? 120_000 : 30_000);
+      }, interactive ? 120_000 : 60_000);
 
       function bindEvents(s: WASocket) {
         s.ev.on("connection.update", async (update) => {
           const { connection, lastDisconnect, qr } = update;
 
           if (qr) {
-            if (!interactive) {
+            qrCount++;
+            if (interactive) {
+              qrcode.generate(qr, { small: true });
+              console.error(
+                "[whatsapp] Scan the QR code above with WhatsApp on your phone"
+              );
+              console.error(
+                "[whatsapp] Go to Settings > Linked Devices > Link a Device"
+              );
+            } else if (qrCount >= 3) {
+              // Multiple QRs means creds are truly invalid
               clearTimeout(timeout);
               resolve("auth_required");
               return;
+            } else {
+              console.error(
+                "[whatsapp] QR received, waiting for auto-reconnect with stored credentials..."
+              );
             }
-            qrcode.generate(qr, { small: true });
-            console.error(
-              "[whatsapp] Scan the QR code above with WhatsApp on your phone"
-            );
-            console.error(
-              "[whatsapp] Go to Settings > Linked Devices > Link a Device"
-            );
           }
 
           if (connection === "close") {
@@ -105,11 +131,10 @@ export async function connectWhatsApp(
               );
               clearTimeout(timeout);
               resolve("auth_required");
-            } else if (interactive) {
+            } else {
               console.error(
                 `[whatsapp] Disconnected (reason: ${reason}), reconnecting...`
               );
-              // Reconnect within the same promise instead of recursing
               setTimeout(async () => {
                 try {
                   currentSock = await createSocket();
@@ -119,9 +144,6 @@ export async function connectWhatsApp(
                   resolve("failed");
                 }
               }, 3000);
-            } else {
-              clearTimeout(timeout);
-              resolve("failed");
             }
           } else if (connection === "open") {
             connectionReady = true;
