@@ -46,77 +46,95 @@ export interface ConnectOptions {
   interactive?: boolean;
 }
 
-export async function connectWhatsApp(
-  options: ConnectOptions = {}
-): Promise<WASocket> {
-  const { interactive = false } = options;
+async function createSocket(): Promise<WASocket> {
   const { version } = await fetchLatestBaileysVersion();
   const { state, saveCreds } = await getAuthState();
 
-  sock = makeWASocket({
+  const s = makeWASocket({
     version,
     logger,
     auth: state,
   });
 
-  // Bind our custom store to socket events
-  store.bind(sock);
+  sock = s;
+  store.bind(s);
+  s.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("creds.update", saveCreds);
+  return s;
+}
 
-  // Wait for connection result
+export async function connectWhatsApp(
+  options: ConnectOptions = {}
+): Promise<WASocket> {
+  const { interactive = false } = options;
+
+  let currentSock = await createSocket();
+
   const result = await new Promise<"open" | "auth_required" | "failed">(
     (resolve) => {
       const timeout = setTimeout(() => {
         resolve("failed");
       }, interactive ? 120_000 : 30_000);
 
-      sock!.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect, qr } = update;
+      function bindEvents(s: WASocket) {
+        s.ev.on("connection.update", async (update) => {
+          const { connection, lastDisconnect, qr } = update;
 
-        if (qr) {
-          if (!interactive) {
-            clearTimeout(timeout);
-            resolve("auth_required");
-            return;
-          }
-          qrcode.generate(qr, { small: true });
-          console.error(
-            "[whatsapp] Scan the QR code above with WhatsApp on your phone"
-          );
-          console.error(
-            "[whatsapp] Go to Settings > Linked Devices > Link a Device"
-          );
-        }
-
-        if (connection === "close") {
-          connectionReady = false;
-          const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
-
-          if (reason === DisconnectReason.loggedOut) {
+          if (qr) {
+            if (!interactive) {
+              clearTimeout(timeout);
+              resolve("auth_required");
+              return;
+            }
+            qrcode.generate(qr, { small: true });
             console.error(
-              "[whatsapp] Logged out. Delete auth_state/ and re-authenticate."
+              "[whatsapp] Scan the QR code above with WhatsApp on your phone"
+            );
+            console.error(
+              "[whatsapp] Go to Settings > Linked Devices > Link a Device"
+            );
+          }
+
+          if (connection === "close") {
+            connectionReady = false;
+            const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
+
+            if (reason === DisconnectReason.loggedOut) {
+              console.error(
+                "[whatsapp] Logged out. Delete auth_state/ and re-authenticate."
+              );
+              clearTimeout(timeout);
+              resolve("auth_required");
+            } else if (interactive) {
+              console.error(
+                `[whatsapp] Disconnected (reason: ${reason}), reconnecting...`
+              );
+              // Reconnect within the same promise instead of recursing
+              setTimeout(async () => {
+                try {
+                  currentSock = await createSocket();
+                  bindEvents(currentSock);
+                } catch {
+                  clearTimeout(timeout);
+                  resolve("failed");
+                }
+              }, 3000);
+            } else {
+              clearTimeout(timeout);
+              resolve("failed");
+            }
+          } else if (connection === "open") {
+            connectionReady = true;
+            console.error(
+              `[whatsapp] Connected as ${sock?.user?.name || sock?.user?.id}`
             );
             clearTimeout(timeout);
-            resolve("auth_required");
-          } else if (interactive) {
-            console.error(
-              `[whatsapp] Disconnected (reason: ${reason}), reconnecting...`
-            );
-            setTimeout(() => connectWhatsApp(options), 3000);
-          } else {
-            clearTimeout(timeout);
-            resolve("failed");
+            resolve("open");
           }
-        } else if (connection === "open") {
-          connectionReady = true;
-          console.error(
-            `[whatsapp] Connected as ${sock?.user?.name || sock?.user?.id}`
-          );
-          clearTimeout(timeout);
-          resolve("open");
-        }
-      });
+        });
+      }
+
+      bindEvents(currentSock);
     }
   );
 
@@ -136,5 +154,5 @@ export async function connectWhatsApp(
     );
   }
 
-  return sock;
+  return sock!;
 }
