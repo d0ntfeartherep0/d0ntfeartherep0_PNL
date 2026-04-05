@@ -11,7 +11,7 @@ async function main() {
   await connectWhatsApp();
 
   console.log("Generating digest...");
-  const filepath = await generateAndSaveDigest(24);
+  const filepath = await generateAndSaveDigest(12);
   console.log(`Digest saved to: ${filepath}`);
 
   process.exit(0);

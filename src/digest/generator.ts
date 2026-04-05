@@ -13,9 +13,10 @@ export async function generateAndSaveDigest(hours: number = 24): Promise<string>
 
   const now = new Date();
   const dateStr = now.toISOString().split("T")[0];
-  const filename = `digest-${dateStr}.md`;
+  const timeLabel = now.getHours() < 12 ? "AM" : "PM";
+  const filename = `digest-${dateStr}-${timeLabel}.md`;
 
-  let md = `# WhatsApp Digest - ${dateStr}\n\n`;
+  let md = `# WhatsApp Digest - ${dateStr} ${timeLabel}\n\n`;
   md += `**Period:** ${digest.period}\n`;
   md += `**From:** ${digest.from}\n`;
   md += `**To:** ${digest.to}\n`;
