@@ -9,7 +9,7 @@ export function startDigestScheduler() {
   cron.schedule(CRON_SCHEDULE, async () => {
     console.error("[digest] Running scheduled digest...");
     try {
-      const filepath = await generateAndSaveDigest(24);
+      const filepath = await generateAndSaveDigest();
       console.error(`[digest] Saved to: ${filepath}`);
     } catch (err) {
       console.error("[digest] Failed to generate digest:", err);
