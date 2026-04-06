@@ -28,8 +28,11 @@ You need a Spotify Developer app. If you don't have one:
 
 ### 2. Install Dependencies
 
+From the repo directory:
+
 ```bash
-pip install -e .
+cd /path/to/d0ntfeartherep0_PNL
+python3 -m pip install -e .
 ```
 
 ### 3. Configure Environment
@@ -44,7 +47,7 @@ cp .env.example .env
 Run the one-time authentication script:
 
 ```bash
-python scripts/authenticate.py
+python3 scripts/authenticate.py
 ```
 
 This opens your browser for Spotify login and caches the token locally.
