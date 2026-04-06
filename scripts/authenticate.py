@@ -24,23 +24,9 @@ def main():
 
     auth_manager = get_auth_manager()
 
-    # This triggers the full OAuth flow: opens browser, waits for callback,
-    # exchanges code for token, and caches it.
-    token_info = auth_manager.get_cached_token()
-    if token_info and not auth_manager.is_token_expired(token_info):
-        print("Found valid cached token — already authenticated!")
-        print(f"Token cached at: {auth_manager.cache_handler.cache_path}")
-        return
-
-    # No valid token — run the authorization flow
-    auth_url = auth_manager.get_authorize_url()
-    print(f"Opening: {auth_url}\n")
-    print("After authorizing, you'll be redirected to the callback URL.")
-    print("Paste the full redirect URL here if the browser doesn't handle it automatically.\n")
-
-    response_url = auth_manager.get_auth_response()
-    code = auth_manager.parse_response_code(response_url)
-    token_info = auth_manager.get_access_token(code)
+    # SpotifyPKCE.get_access_token() handles the entire flow:
+    # opens browser, starts local server for callback, exchanges code, caches token.
+    token_info = auth_manager.get_access_token()
 
     if token_info:
         print("\nAuthentication successful!")
