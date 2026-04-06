@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 logging.basicConfig(
     level=logging.DEBUG,
-    filename=str(Path(__file__).resolve().parent.parent / "mcp_server.log"),
+    stream=sys.stderr,
     format="%(asctime)s %(levelname)s %(message)s",
 )
 logger = logging.getLogger(__name__)
