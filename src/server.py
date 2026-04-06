@@ -6,15 +6,27 @@ and create playlists based on the user's music taste.
 """
 
 import json
+import logging
 import sys
 from pathlib import Path
 
 # Ensure project root is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from mcp.server.fastmcp import FastMCP
+logging.basicConfig(
+    level=logging.DEBUG,
+    filename=str(Path(__file__).resolve().parent.parent / "mcp_server.log"),
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-from src.tools import listening_data, playlists, search
+try:
+    from mcp.server.fastmcp import FastMCP
+    from src.tools import listening_data, playlists, search
+    logger.info("All imports successful")
+except Exception as e:
+    logger.error(f"Import failed: {e}", exc_info=True)
+    raise
 
 mcp = FastMCP(
     "spotify-playlist-generator",

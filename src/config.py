@@ -3,7 +3,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from project root (works regardless of cwd)
+_project_root = Path(__file__).resolve().parent.parent
+load_dotenv(_project_root / ".env")
 
 SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_REDIRECT_URI = os.environ.get(
