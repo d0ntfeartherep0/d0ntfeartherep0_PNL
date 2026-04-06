@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "spotify": {
+      "command": "python3",
+      "args": ["src/server.py"],
+      "env": {
+        "SPOTIFY_CLIENT_ID": ""
+      }
+    }
+  }
+}

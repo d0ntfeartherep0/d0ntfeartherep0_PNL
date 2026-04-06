@@ -1,0 +1,15 @@
+[project]
+name = "spotify-playlist-mcp"
+version = "0.1.0"
+description = "MCP server for Spotify playlist generation using Claude"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0.0",
+    "spotipy>=2.24.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
