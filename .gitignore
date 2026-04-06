@@ -18,6 +18,9 @@ venv/
 .vscode/
 .idea/
 
+# Logs
+mcp_server.log
+
 # OS
 .DS_Store
 Thumbs.db
