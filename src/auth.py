@@ -1,5 +1,5 @@
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy.oauth2 import SpotifyPKCE
 
 from src.config import (
     SPOTIFY_CLIENT_ID,
@@ -9,16 +9,15 @@ from src.config import (
 )
 
 
-def get_auth_manager() -> SpotifyOAuth:
-    """Create a SpotifyOAuth manager with PKCE-compatible settings."""
+def get_auth_manager() -> SpotifyPKCE:
+    """Create a SpotifyPKCE auth manager (no client secret needed)."""
     if not SPOTIFY_CLIENT_ID:
         raise ValueError(
             "SPOTIFY_CLIENT_ID is not set. "
             "Copy .env.example to .env and add your Client ID."
         )
-    return SpotifyOAuth(
+    return SpotifyPKCE(
         client_id=SPOTIFY_CLIENT_ID,
-        client_secret=None,
         redirect_uri=SPOTIFY_REDIRECT_URI,
         scope=SPOTIFY_SCOPES,
         cache_path=SPOTIFY_TOKEN_CACHE_PATH,
