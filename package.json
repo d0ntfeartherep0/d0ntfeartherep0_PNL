@@ -8,6 +8,9 @@
     "start": "tsx src/index.ts",
     "auth": "tsx src/auth-setup.ts",
     "digest": "tsx src/digest/run-digest.ts",
+    "spotify-auth": "tsx src/scripts/spotify-auth.ts",
+    "spotify-melbourne-gigs": "tsx src/scripts/spotify-melbourne-gigs.ts",
+    "spotify-gigs-mcp": "tsx src/servers/spotify-gigs.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

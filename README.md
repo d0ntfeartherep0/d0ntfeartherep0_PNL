@@ -126,6 +126,83 @@ Environment variables (set in `.env` or in the MCP server config):
 3. Claude uses stdio transport to communicate with the MCP server
 4. Your phone and Mac WhatsApp apps continue working normally alongside this connection
 
+## Spotify + Gigs (separate MCP server & CLI)
+
+A second integration lives alongside WhatsApp under `src/integrations/spotify/`
+and `src/integrations/ticketmaster/`. It can be used standalone (one-shot CLI)
+or as its own MCP server.
+
+### Repository layout
+
+```
+src/
+  integrations/        one folder per external service
+    spotify/           OAuth, API client, MCP tool registrations
+    ticketmaster/      Discovery API client, MCP tool registrations
+  workflows/           cross-integration logic (e.g. liked-artists-gigs)
+  servers/             MCP server entrypoints (one per server)
+  scripts/             standalone CLI runners
+  whatsapp/, digest/, tools/, index.ts, auth-setup.ts   (existing WhatsApp)
+```
+
+To add a new integration: drop a folder under `src/integrations/<name>/` with
+its own `client.ts` and `register-tools.ts`. Compose it into a server under
+`src/servers/`. Cross-integration logic goes in `src/workflows/`.
+
+### Setup
+
+1. Create a Spotify app at https://developer.spotify.com/dashboard.
+   - Add redirect URI: `http://127.0.0.1:8765/callback`
+   - Note the Client ID
+2. Get a Ticketmaster Discovery API key at https://developer.ticketmaster.com.
+3. Authenticate (one-time):
+   ```bash
+   SPOTIFY_CLIENT_ID=xxx npm run spotify-auth
+   ```
+   Tokens are saved to `spotify_auth/tokens.json` (gitignored).
+
+### Standalone CLI
+
+```bash
+SPOTIFY_CLIENT_ID=xxx \
+TICKETMASTER_API_KEY=yyy \
+npm run spotify-melbourne-gigs
+```
+
+Optional env: `GIGS_CITY` (default `Melbourne`), `GIGS_COUNTRY` (default `AU`),
+`GIGS_MAX_TRACKS`, `GIGS_MAX_ARTISTS`.
+
+### MCP server
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "spotify-gigs": {
+      "command": "npx",
+      "args": ["tsx", "/absolute/path/to/d0ntfeartherep0_PNL/src/servers/spotify-gigs.ts"],
+      "env": {
+        "SPOTIFY_CLIENT_ID": "xxx",
+        "SPOTIFY_AUTH_DIR": "/absolute/path/to/d0ntfeartherep0_PNL/spotify_auth",
+        "TICKETMASTER_API_KEY": "yyy"
+      }
+    }
+  }
+}
+```
+
+Tools exposed:
+
+| Tool | Description |
+|------|-------------|
+| `spotify_get_saved_tracks` | Liked tracks (paged) |
+| `spotify_get_saved_artists` | Deduped artists across liked tracks |
+| `spotify_get_currently_playing` | Currently playing track |
+| `spotify_search_tracks` | Search Spotify for tracks |
+| `ticketmaster_find_gigs` | Search events by artist + city |
+| `find_gigs_for_liked_artists` | Combined: liked artists × city gigs |
+
 ## Troubleshooting
 
 **QR code not showing:** Make sure you're running in a terminal that supports QR rendering. Try `npm run auth` directly.
